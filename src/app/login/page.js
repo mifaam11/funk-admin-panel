@@ -46,7 +46,7 @@ export default function AdminLogin() {
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
                 {/* Header Section */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-center">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-center">
                     <h1 className="text-2xl md:text-3xl font-bold text-white">Funk Store Admin</h1>
                     <p className="text-blue-100 mt-1">Enter your credentials to access the dashboard</p>
                 </div>

@@ -1,145 +1,275 @@
-import React, { useState } from "react";
+"use client";
 
-export default function ProductForm({ onClose, onSubmit }) {
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+export default function ProductForm({
+    mode = "add",
+    productId,
+    initialData = null,
+    onSubmit,
+    isSubmitting
+}) {
+    const router = useRouter();
+    const isEditMode = mode === "edit";
+
     const [formData, setFormData] = useState({
         name: "",
         description: "",
         price: "",
         category: "",
-        imageFile: null,
+        stock: "",
+        status: "",
+        image: null,
     });
 
-    const [preview, setPreview] = useState(null);
-    const [errors, setErrors] = useState({});
+    const [previewImage, setPreviewImage] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (isEditMode && initialData) {
+            setFormData({
+                name: initialData.name || "",
+                description: initialData.description || "",
+                price: initialData.price || "",
+                category: initialData.category || "",
+                stock: initialData.stock || "",
+                status: initialData.status || "",
+                image: null,
+            });
+            setPreviewImage(initialData.image || "");
+        }
+    }, [initialData, isEditMode]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            setFormData({ ...formData, imageFile: file });
-            setPreview(URL.createObjectURL(file));
+            setFormData((prev) => ({ ...prev, image: file }));
+            setPreviewImage(URL.createObjectURL(file));
         }
     };
 
-    const validate = () => {
-        const newErrors = {};
-        if (!formData.name) newErrors.name = "Product name is required";
-        if (!formData.price) newErrors.price = "Price is required";
-        if (!formData.category) newErrors.category = "Category is required";
-        if (!formData.imageFile) newErrors.imageFile = "Product image is required";
-        return newErrors;
-    };
-
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const validationErrors = validate();
-        if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-        } else {
-            // Prepare data for submission
-            const submissionData = new FormData();
-            submissionData.append("name", formData.name);
-            submissionData.append("description", formData.description);
-            submissionData.append("price", formData.price);
-            submissionData.append("category", formData.category);
-            submissionData.append("image", formData.imageFile);
 
-            onSubmit(submissionData); // Assuming onSubmit handles FormData
-            onClose(); // Close modal
+        if (!isEditMode) return onSubmit?.(formData);
+
+        setIsLoading(true);
+        try {
+            let imageUrl = previewImage;
+
+            if (formData.image instanceof File) {
+                const uploadData = new FormData();
+                uploadData.append("file", formData.image);
+                uploadData.append("upload_preset", "funk_products");
+
+                const res = await axios.post(
+                    "https://api.cloudinary.com/v1_1/du7l08d8j/image/upload",
+                    uploadData
+                );
+
+                imageUrl = res.data.secure_url;
+            }
+
+            const payload = {
+                name: formData.name,
+                description: formData.description,
+                price: parseFloat(formData.price),
+                category: formData.category,
+                stock: parseInt(formData.stock),
+                status: formData.status,
+                image: imageUrl,
+            };
+
+            await axios.put(`${BASE_URL}/${productId}`, payload);
+            toast.success("Product updated successfully");
+            router.push("/products");
+            router.refresh();
+        } catch (err) {
+            console.error("Error updating product:", err);
+            toast.error(err.response?.data?.message || "Update failed");
+        } finally {
+            setIsLoading(false);
+        } e
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm("Are you sure you want to delete this product?")) return;
+        try {
+            setIsLoading(true);
+            await axios.delete(`${BASE_URL}/${productId}`);
+            toast.success("Product deleted");
+            router.push("/products");
+        } catch (err) {
+            console.error("Delete error:", err);
+            toast.error("Failed to delete product");
+        } finally {
+            setIsLoading(false);
         }
     };
+
+    const handleCancel = () => router.push("/products");
+
+    if (isEditMode && isLoading && !formData.name) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin h-10 w-10 border-t-2 border-b-2 border-blue-600 rounded-full" />
+            </div>
+        );
+    }
 
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg transition-all">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Add New Product</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Other inputs (same as before) */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Product Name</label>
-                    <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        className={`mt-1 w-full px-4 py-2 border ${errors.name ? "border-red-500" : "border-gray-300"
-                            } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Enter product name"
-                    />
-                    {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                    {isEditMode ? (
+                        <>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Product ID</label>
+                            <input
+                                type="text"
+                                value={productId}
+                                readOnly
+                                disabled
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                            />
+                        </>
+                    ) : (
+                        <div className="h-0" /> // Keeps spacing same in "add" mode
+                    )}
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <input
+                        name="name"
+                        type="text"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                    <input
+                        name="category"
+                        type="text"
+                        value={formData.category}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
+                    <input
+                        name="price"
+                        type="number"
+                        value={formData.price}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.01"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Stock *</label>
+                    <input
+                        name="stock"
+                        type="number"
+                        value={formData.stock}
+                        onChange={handleChange}
+                        min="0"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <input
+                        name="status"
+                        type="text"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                </div>
+
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                     <textarea
                         name="description"
                         value={formData.description}
                         onChange={handleChange}
-                        className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter product description"
+                        rows="3"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Price ($)</label>
-                    <input
-                        type="number"
-                        name="price"
-                        value={formData.price}
-                        onChange={handleChange}
-                        className={`mt-1 w-full px-4 py-2 border ${errors.price ? "border-red-500" : "border-gray-300"
-                            } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="Enter price"
-                    />
-                    {errors.price && <p className="text-red-500 text-sm mt-1">{errors.price}</p>}
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Category</label>
-                    <input
-                        type="text"
-                        name="category"
-                        value={formData.category}
-                        onChange={handleChange}
-                        className={`mt-1 w-full px-4 py-2 border ${errors.category ? "border-red-500" : "border-gray-300"
-                            } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        placeholder="e.g. Shirts, Shoes"
-                    />
-                    {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category}</p>}
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Product Image</label>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
                     <input
                         type="file"
                         accept="image/*"
                         onChange={handleImageChange}
-                        className={`mt-1 w-full px-4 py-2 border ${errors.imageFile ? "border-red-500" : "border-gray-300"
-                            } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className="block w-full text-sm text-gray-500 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
-                    {errors.imageFile && <p className="text-red-500 text-sm mt-1">{errors.imageFile}</p>}
-                    {preview && <img src={preview} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-lg" />}
+                    {previewImage && (
+                        <img
+                            src={previewImage}
+                            alt="Preview"
+                            className="h-40 mt-4 object-contain border rounded-md"
+                        />
+                    )}
                 </div>
+            </div>
 
-                <div className="flex justify-end space-x-4 pt-4">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-                    >
-                        Cancel
-                    </button>
+            <div className="flex justify-between pt-6 border-t">
+                <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="px-4 py-2 text-gray-600 border rounded hover:bg-gray-100"
+                    disabled={isLoading}
+                >
+                    Cancel
+                </button>
+
+                <div className="flex gap-3">
+                    {isEditMode && (
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                            disabled={isLoading}
+                        >
+                            Delete
+                        </button>
+                    )}
                     <button
                         type="submit"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        disabled={isLoading || isSubmitting}
                     >
-                        Save Product
+                        {isLoading || isSubmitting
+                            ? isEditMode ? "Updating..." : "Adding..."
+                            : isEditMode ? "Update" : "Add"}
                     </button>
                 </div>
-            </form>
-        </div>
+            </div>
+        </form>
     );
 }
