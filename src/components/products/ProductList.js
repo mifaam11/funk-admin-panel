@@ -1,18 +1,12 @@
 "use client";
-import axios from "axios";
-import toast from "react-hot-toast";
-
 import React, { useState, useEffect } from "react";
-import {
-    FiEdit,
-    FiTrash2,
-    FiPlus,
-    FiSearch,
-    FiChevronDown,
-    FiChevronUp
-} from "react-icons/fi";
+import { FiEdit, FiTrash2, FiPlus, FiSearch, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+
+// Import reusable API functions
+import { getData, deleteData } from "@/utils/api";
 
 export default function ProductList() {
     const router = useRouter();
@@ -24,26 +18,13 @@ export default function ProductList() {
     const [error, setError] = useState(null);
     const productsPerPage = 5;
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
     // Fetch products
     useEffect(() => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const response = await fetch(`${apiUrl}/`, {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Accept: "application/json"
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
+                const data = await getData("/");
                 setProducts(data);
             } catch (error) {
                 console.error("Failed to fetch products:", error);
@@ -54,44 +35,22 @@ export default function ProductList() {
         };
 
         fetchProducts();
-    }, [apiUrl]);
+    }, []);
 
     const handleDeleteProduct = async (id) => {
         if (!window.confirm("Delete this product?")) return;
         try {
             setLoading(true);
-            await axios.delete(`http://localhost:5000/${id}`);
+            await deleteData(`/${id}`);
             toast.success("Product deleted");
-            const res = await axios.get(`${apiUrl}/`);
-            setProducts(res.data);
+            const updatedProducts = await getData("/");
+            setProducts(updatedProducts);
         } catch (err) {
             console.error("Delete error:", err);
-            toast.error("Failed to delete");
+            toast.error("Failed to delete product");
         } finally {
             setLoading(false);
         }
-        // try {
-        //     const deleteUrl = `${apiUrl}/${id}`;
-        //     console.log("Deleting:", deleteUrl);
-
-        //     const response = await fetch(deleteUrl, {
-        //         method: "DELETE",
-        //         headers: {
-        //             "Content-Type": "application/json"
-        //         }
-        //     });
-
-        //     if (!response.ok) {
-        //         const isJson = response.headers.get("content-type")?.includes("application/json");
-        //         const data = isJson ? await response.json() : await response.text();
-        //         throw new Error(data?.message || `HTTP error! status: ${response.status}`);
-        //     }
-
-        //     setProducts(products.filter((product) => product._id !== id));
-        // } catch (err) {
-        //     console.error("Error deleting product:", err);
-        //     setError("Failed to delete product. Please try again.");
-        // }
     };
 
     const filteredProducts = products.filter((product) =>
