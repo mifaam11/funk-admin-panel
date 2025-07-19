@@ -200,13 +200,17 @@ export default function ProductForm({
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <input
+                    <select
                         name="status"
-                        type="text"
                         value={formData.status}
                         onChange={handleChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
+                    >
+                        <option value="">Select status</option>
+                        <option value="products">Products</option>
+                        <option value="flash-sale">Flash Sale</option>
+                    </select>
+
                 </div>
 
                 <div className="md:col-span-2">
