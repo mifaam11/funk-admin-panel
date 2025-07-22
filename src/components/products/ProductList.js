@@ -16,7 +16,7 @@ export default function ProductList() {
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const productsPerPage = 5;
+    const productsPerPage = 10;
 
     // Fetch products
     useEffect(() => {
